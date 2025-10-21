@@ -1,2 +1,3 @@
 # cm_project2
-Configuration management. Task 2
+### Конфигурационное управление. Задание №2
+
