@@ -1,5 +1,7 @@
 import sys
 import xml.etree.ElementTree as ET
+from urllib.request import urlopen 
+import json
 
 def parse_arguments():
     if len(sys.argv) < 2:
@@ -87,7 +89,67 @@ if command == 'config':
     except Exception as e:
          print(f"Ошибка при работе с config.xml: {e}")
 
+#gdd - get dependency data
+elif command == 'gdd':
+    tree = ET.parse('config.xml')
+    root = tree.getroot()
+
+    package_name = root.find('package_name').text
+    repo_url = root.find('repository_url').text
+    version = root.find('version').text
+
+    full_url = F"{repo_url}/{package_name}/{version}"
+    response = urlopen(full_url)
+
+    res1 = response.read() #получаем в байтах
+    res2 = res1.decode('utf-8')
+
+    # Берем только первую строку (она содержит все ключи верхнего уровня)
+    first_line = res2.split('\n')[0]
+    
+    # Убираем фигурные скобки
+    clean_content = first_line.strip().strip('{}')
+    
+    # Счетчик для отслеживания вложенности
+    brace_count = 0
+    current_key = "" #текущий найденный ключ
+    keys = [] #список всех найденных ключей
+    
+    i = 0
+    while i < len(clean_content):
+        if clean_content[i] == '"' and brace_count == 0:
+            # Начало ключа
+            start = i + 1
+            end = clean_content.find('"', start) #5-первый
+            if end != -1:
+                current_key = clean_content[start:end] #name
+                i = end #=5
+        elif clean_content[i] == ':': 
+            if current_key and brace_count == 0: #если верхний уровень и слово(name)
+                keys.append(current_key) # keys = ["name"]
+                current_key = "" #очищаем
+        elif clean_content[i] == '{':
+            brace_count += 1
+        elif clean_content[i] == '}':
+            brace_count -= 1
+        elif clean_content[i] == '[':
+            brace_count += 1
+        elif clean_content[i] == ']':
+            brace_count -= 1
+            
+        i += 1
+
+    # Выводим на экран
+    has_dependencies = False
+    for key in keys:
+        if key != "name":
+            print(f"{package_name} -> {key}")
+            has_dependencies = True
+    
+    if not has_dependencies:
+        print(f"Пакет {package_name} не имеет зависимостей")
 else:
     print(f"неизвестная команда: {command}")
     print("Доступные команды: config")
+
 
